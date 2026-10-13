@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Weblog</title>
+    <style>
+        /* Classic Old-School Aesthetic CSS */
+        body {
+            font-family: "Times New Roman", Times, serif;
+            background-color: #FDF5E6; /* Old Lace background */
+            color: #000000;
+            margin: 0;
+            padding: 20px 10px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background-color: #FFFFFF;
+            border: 2px solid #000000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        h1, h2, h3 {
+            font-weight: normal;
+            margin-top: 0;
+        }
+        h1 {
+            font-size: 2.2em;
+            font-style: italic;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        a {
+            color: #0000EE;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        a:visited {
+            color: #551A8B;
+        }
+        hr {
+            border: 0;
+            border-bottom: 1px dashed #666;
+            margin: 20px 0;
+        }
+        .nav-bar {
+            background-color: #EEEEEE;
+            border: 1px solid #CCCCCC;
+            padding: 5px 10px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+        }
+        .view {
+            display: none; /* Used for SPA toggling */
+        }
+        .active-view {
+            display: block;
+        }
+        input[type="text"], input[type="email"], input[type="password"], textarea {
+            font-family: "Courier New", Courier, monospace;
+            border: 1px inset #999;
+            padding: 5px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            background-color: #FAFAFA;
+        }
+        button {
+            font-family: "Times New Roman", Times, serif;
+            background-color: #D4D0C8; /* Classic Windows grey */
+            border: 2px outset #FFFFFF;
+            border-bottom-color: #404040;
+            border-right-color: #404040;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 5px;
+        }
+        button:active {
+            border: 2px inset #FFFFFF;
+            border-top-color: #404040;
+            border-left-color: #404040;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: none;
+            border: 1px solid red;
+            padding: 5px;
+            background: #FFE6E6;
+        }
+        .blog-list {
+            list-style-type: square;
+            padding-left: 20px;
+        }
+        .blog-list li {
+            margin-bottom: 10px;
+        }
+        .blog-date {
+            color: #555;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>My Personal Weblog</h1>
+
+    <!-- View: Login / Registration -->
+    <div id="login-view" class="view active-view">
+        <h2>Authentication Required</h2>
+        <p>Please enter your credentials to manage your weblog.</p>
+        <div id="auth-error" class="error-message"></div>
+        
+        <label for="auth-email"><b>Email Address:</b></label>
+        <input type="email" id="auth-email" placeholder="you@example.com">
+        
+        <label for="auth-password"><b>Password:</b></label>
+        <input type="password" id="auth-password" placeholder="********">
+        
+        <div style="margin-top: 10px;">
+            <button onclick="handleLogin()">Log In</button>
+            <button onclick="handleSignup()">Create Account</button>
+        </div>
+    </div>
+
+    <!-- View: Dashboard -->
+    <div id="dashboard-view" class="view">
+        <div class="nav-bar">
+            <span>Welcome, <b id="user-display">User</b></span>
+            <span>
+                <a onclick="showView('editor-view')">[ Write New Post ]</a> | 
+                <a onclick="handleLogout()">[ Logout ]</a>
+            </span>
+        </div>
+        
+        <h2>Dashboard</h2>
+        <p>Here are your previous entries:</p>
+        <div id="loading-indicator" style="display:none;"><i>Loading archives...</i></div>
+        <ul id="blog-list" class="blog-list">
+            <!-- Dynamically populated -->
+        </ul>
+    </div>
+
+    <!-- View: Editor -->
+    <div id="editor-view" class="view">
+        <div class="nav-bar">
+            <span>Drafting a new entry</span>
+            <span>
+                <a onclick="showView('dashboard-view')">[ Cancel & Go Back ]</a>
+            </span>
+        </div>
+
+        <h2>New Weblog Entry</h2>
+        <div id="editor-error" class="error-message"></div>
+
+        <label for="post-title"><b>Title:</b></label>
+        <input type="text" id="post-title" placeholder="Enter title here...">
+        
+        <label for="post-content"><b>Body:</b></label>
+        <textarea id="post-content" rows="15" placeholder="Write your thoughts..."></textarea>
+        
+        <button onclick="savePost()">Publish Entry</button>
+    </div>
+
+    <!-- View: Read Post -->
+    <div id="post-view" class="view">
+        <div class="nav-bar">
+            <span>Viewing Entry</span>
+            <span>
+                <a onclick="showView('dashboard-view')">[ Return to Dashboard ]</a>
+            </span>
+        </div>
+        
+        <h2 id="view-title"></h2>
+        <div><i>Published on: <span id="view-date"></span></i></div>
+        <hr>
+        <div id="view-content" style="white-space: pre-wrap; margin-top: 15px;"></div>
+    </div>
+</div>
+
+<script type="module">
+    // 1. Import your external config file
+    import { firebaseConfig } from './firebase-config.js';
+
+    // 2. Import Firebase tools
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = 'classic-weblog';
+
+    // 3. Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentBlogs = []; // Store blogs in memory to enable SPA navigation
+
+    // Global functions attached to window for inline HTML onclick attributes
+    window.showView = function(viewId) {
+        document.querySelectorAll('.view').forEach(el => {
+            el.classList.remove('active-view');
+        });
+        document.getElementById(viewId).classList.add('active-view');
+        
+        // Reset forms when navigating away
+        if(viewId === 'editor-view') {
+            document.getElementById('post-title').value = '';
+            document.getElementById('post-content').value = '';
+        }
+    };
+
+    function showError(elementId, message) {
+        const errEl = document.getElementById(elementId);
+        errEl.innerText = message;
+        errEl.style.display = 'block';
+        setTimeout(() => { errEl.style.display = 'none'; }, 6000);
+    }
+
+    window.handleLogin = async function() {
+        const email = document.getElementById('auth-email').value;
+        const pwd = document.getElementById('auth-password').value;
+        if(!email || !pwd) return showError('auth-error', 'Please enter email and password.');
+        try {
+            await signInWithEmailAndPassword(auth, email, pwd);
+        } catch(e) {
+            showError('auth-error', 'Login failed: ' + e.message);
+        }
+    };
+
+    window.handleSignup = async function() {
+        const email = document.getElementById('auth-email').value;
+        const pwd = document.getElementById('auth-password').value;
+        if(!email || !pwd) return showError('auth-error', 'Please enter email and password.');
+        try {
+            await createUserWithEmailAndPassword(auth, email, pwd);
+        } catch(e) {
+            showError('auth-error', 'Signup failed: ' + e.message);
+        }
+    };
+
+    window.handleLogout = async function() {
+        await signOut(auth);
+    };
+
+    async function loadBlogs(userId) {
+        document.getElementById('loading-indicator').style.display = 'block';
+        const blogsRef = collection(db, 'artifacts', appId, 'users', userId, 'blogs');
+        
+        try {
+            const snapshot = await getDocs(blogsRef);
+            let blogs = [];
+            snapshot.forEach(doc => {
+                blogs.push({ id: doc.id, ...doc.data() });
+            });
+            
+            // Sort by timestamp descending in memory (latest first)
+            blogs.sort((a, b) => b.timestamp - a.timestamp);
+            currentBlogs = blogs;
+            renderBlogsList(blogs);
+        } catch(e) {
+            console.error("Error loading entries:", e);
+            showError('auth-error', 'Failed to load entries from server.');
+        } finally {
+            document.getElementById('loading-indicator').style.display = 'none';
+        }
+    }
+
+    function renderBlogsList(blogs) {
+        const listEl = document.getElementById('blog-list');
+        listEl.innerHTML = '';
+        
+        if (blogs.length === 0) {
+            listEl.innerHTML = '<li><i>No entries found. Click [ Write New Post ] to begin.</i></li>';
+            return;
+        }
+
+        blogs.forEach(blog => {
+            const li = document.createElement('li');
+            const dateStr = new Date(blog.timestamp).toLocaleDateString();
+            
+            const link = document.createElement('a');
+            link.innerText = blog.title;
+            link.onclick = () => viewPost(blog.id);
+            
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'blog-date';
+            dateSpan.innerText = `(${dateStr})`;
+            
+            li.appendChild(link);
+            li.appendChild(dateSpan);
+            listEl.appendChild(li);
+        });
+    }
+
+    window.savePost = async function() {
+        const user = auth.currentUser;
+        if (!user) return; // Guard clause
+        
+        const title = document.getElementById('post-title').value.trim();
+        const content = document.getElementById('post-content').value.trim();
+        
+        if (!title || !content) {
+            return showError('editor-error', 'Title and Content are required.');
+        }
+
+        const blogsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'blogs');
+        try {
+            await addDoc(blogsRef, {
+                title: title,
+                content: content,
+                timestamp: Date.now()
+            });
+            window.showView('dashboard-view');
+            loadBlogs(user.uid); // Refresh the list
+        } catch (e) {
+            console.error("Save failed:", e);
+            showError('editor-error', 'Failed to save the entry.');
+        }
+    };
+
+    window.viewPost = function(blogId) {
+        const blog = currentBlogs.find(b => b.id === blogId);
+        if (!blog) return;
+        
+        document.getElementById('view-title').innerText = blog.title;
+        document.getElementById('view-date').innerText = new Date(blog.timestamp).toLocaleString();
+        
+        // Using innerText mapping to preserve raw text but maintain line breaks securely
+        document.getElementById('view-content').innerText = blog.content;
+        
+        window.showView('post-view');
+    };
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            document.getElementById('user-display').innerText = user.email || `User ${user.uid.substring(0,6)}...`;
+            window.showView('dashboard-view');
+            loadBlogs(user.uid);
+        } else {
+            window.showView('login-view');
+        }
+    });
+
+</script>
+
+
+<p><center>Created by Bishal Dey</center></p>
+
+</body>
+</html>
